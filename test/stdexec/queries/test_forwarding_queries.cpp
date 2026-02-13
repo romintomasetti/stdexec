@@ -40,6 +40,18 @@ namespace {
 
   inline constexpr my_non_forwarding_query_t my_non_forwarding_query{};
 
+  constexpr struct FwdFoo
+    : STDEXEC::__query<FwdFoo>
+    , STDEXEC::forwarding_query_t {
+    using STDEXEC::__query<FwdFoo>::operator();
+  } fwd_foo{};
+
+  constexpr struct Foo : STDEXEC::__query<Foo> {
+  } foo{};
+
+  constexpr struct Bar : STDEXEC::__query<Bar> {
+  } bar{};
+
   TEST_CASE("exec.queries are forwarding queries", "[exec.queries][forwarding_queries]") {
     static_assert(ex::forwarding_query(ex::get_allocator));
     static_assert(ex::forwarding_query(ex::get_stop_token));
@@ -56,5 +68,18 @@ namespace {
     static_assert(ex::forwarding_query(my_forwarding_query));
     static_assert(ex::forwarding_query(my_derived_forwarding_query));
     static_assert(!ex::forwarding_query(my_non_forwarding_query));
+  }
+
+  TEST_CASE("nested properties are not treated equal", "[exec.queries][forwarding_queries]") {
+    static_assert([]() {
+      auto env = STDEXEC::env{
+        STDEXEC::env{STDEXEC::prop{fwd_foo, 42.}, STDEXEC::prop{foo, 'F'}},
+        STDEXEC::prop{                        bar,                   31415}
+      };
+
+      static_assert(!STDEXEC::__queryable_with<decltype(env), Foo>);
+
+      return fwd_foo(env) == 42. && bar(env) == 31415;
+    }());
   }
 } // namespace
